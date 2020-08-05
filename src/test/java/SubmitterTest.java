@@ -1,6 +1,3 @@
-package test;
-
-import main.Submitter;
 import org.junit.Before;
 import org.junit.Test;
 
