@@ -16,7 +16,7 @@
 </head>
 <body>
 <div class="mainbox">
-  <form action="/submit">
+  <form action="/submit" method="POST">
     <label for="picker"> Name:</label><br>
     <p><select id="dropdown" name="picker" id="picker"></select></p><br>
     <label for="startDate">I want to fill temperature records starting from:</label><br>
@@ -25,6 +25,8 @@
     <p><input type="text" id="endDate" name="endDate"></p>
     <label for="pin">My PIN is:</label><br>
     <p><input type="text" id="pin" name="pin"></p>
+    <p><input type="checkbox" id="consent" name="consent">
+    <label for="consent"> I acknowledge that this submits randomly-generated temperatures. I'm not responsible for what happens to you.</label></p><br>
     <input type="submit">
   </form>
 </div>

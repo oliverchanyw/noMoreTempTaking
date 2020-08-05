@@ -9,10 +9,17 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.zip.DataFormatException;
 
 public class HTTPHandler implements Runnable {
 
@@ -20,14 +27,16 @@ public class HTTPHandler implements Runnable {
     static final String DEFAULT_FILE = "index.html";
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
+    SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("MM/dd/yyyy");
     // port to listen connection
     static final int PORT = 8080;
 
-    // Client Connection via Socket Class
-    private Socket connect;
+    private Socket connect; // Client Connection via Socket Class
+    private Submitter submitter;
 
     public HTTPHandler(Socket c) {
         connect = c;
+        submitter = new Submitter();
     }
 
     public static void main(String[] args) {
@@ -63,14 +72,20 @@ public class HTTPHandler implements Runnable {
             StringTokenizer parse = new StringTokenizer(input);
 
             String method = parse.nextToken().toUpperCase();
-            String fileRequested = parse.nextToken().toLowerCase();
+            String path = parse.nextToken().toLowerCase();
 
-            // we support only GET and HEAD methods, we check
-            if (!method.equals("GET")  &&  !method.equals("HEAD")) {
-                methodNotSupported(out, dataOut, method);
-            } else { // GET or HEAD method
-                deliverFile(out, dataOut, fileRequested, method);
+            switch (method) {
+                case "POST":
+                    handleSubmit(in, out, dataOut, path);
+                    break;
+                case "GET":
+                case "HEAD":
+                    deliverFile(out, dataOut, path, method);
+                    break;
+                default:
+                    methodNotSupported(out, dataOut, method);
             }
+
             connect.close();
         } catch (IOException ioe) {
             System.err.println("HTTPHandler error : " + ioe);
@@ -96,18 +111,18 @@ public class HTTPHandler implements Runnable {
     }
 
     // return supported MIME Types
-    private String getContentType(String fileRequested) {
-        return (fileRequested.endsWith(".htm")  ||  fileRequested.endsWith(".html")) ? "text/html" : "text/plain";
+    private String getContentType(String path) {
+        return (path.endsWith(".htm")  ||  path.endsWith(".html")) ? "text/html" : "text/plain";
     }
 
     /**
      * Sends the client a FNF page.
      * @param out char output stream to the client (for headers)
      * @param dataOut binary output stream to client (for requested data)
-     * @param fileRequested the file they initially wanted
+     * @param path the file they initially wanted
      * @throws IOException
      */
-    private void fileNotFound(PrintWriter out, OutputStream dataOut, String fileRequested) throws IOException {
+    private void fileNotFound(PrintWriter out, OutputStream dataOut, String path) throws IOException {
         File file = new File(WEB_ROOT, FILE_NOT_FOUND);
         String content = "text/html";
         byte[] fileData = readFileData(file);
@@ -122,7 +137,7 @@ public class HTTPHandler implements Runnable {
         dataOut.write(fileData, 0, (int) file.length());
         dataOut.flush();
 
-        System.out.println("File " + fileRequested + " not found");
+        System.out.println("File " + path + " not found");
     }
 
     /**
@@ -157,16 +172,16 @@ public class HTTPHandler implements Runnable {
      * Gives a client the file they want, for a GET/HEAD request.
      * @param out char output stream to the client (for headers)
      * @param dataOut binary output stream to client (for requested data)
-     * @param fileRequested the file they initially wanted
+     * @param path the file they initially wanted
      * @param method the method they called
      */
-    private void deliverFile(PrintWriter out, OutputStream dataOut, String fileRequested, String method) throws IOException {
-        if (fileRequested.endsWith("/")) fileRequested += DEFAULT_FILE;
+    private void deliverFile(PrintWriter out, OutputStream dataOut, String path, String method) throws IOException {
+        if (path.endsWith("/")) path += DEFAULT_FILE;
 
         try {
-            File file = new File(WEB_ROOT, fileRequested);
+            File file = new File(WEB_ROOT, path);
             int fileLength = (int) file.length();
-            String content = getContentType(fileRequested);
+            String content = getContentType(path);
 
             // send HTTP Headers
             out.println("HTTP/1.1 200 OK");
@@ -180,10 +195,65 @@ public class HTTPHandler implements Runnable {
                 byte[] fileData = readFileData(file);
                 dataOut.write(fileData, 0, fileLength);
                 dataOut.flush();
-                System.out.println("File " + fileRequested + " of type " + content + " returned");
+                System.out.println("File " + path + " of type " + content + " returned");
             }
         } catch (FileNotFoundException fnfe) {
-            fileNotFound(out, dataOut, fileRequested);
+            fileNotFound(out, dataOut, path);
+        }
+    }
+
+
+    /**
+     *
+     * @param in
+     * @param out char output stream to the client (for headers)
+     * @param dataOut binary output stream to client (for requested data)
+     * @param path the local URL path
+     */
+    private void handleSubmit(BufferedReader in, PrintWriter out, BufferedOutputStream dataOut, String path) {
+       if (!"/submit".equals(path)) return;
+
+       String line;
+       int contentLength = 0;
+       char[] bodyArr = null;
+       try {
+           line = in.readLine();
+           while (line.length() != 0) {
+               System.out.println(line);
+               if (line.startsWith("Content-Length:")) {
+                   contentLength = Integer.parseInt(line.substring(16));
+                   bodyArr = new char[contentLength];
+               }
+               line = in.readLine();
+           }
+           in.read(bodyArr, 0, contentLength);
+
+           String[] body = new String(bodyArr).split("&");
+           Map<String, String> params = new HashMap<>();
+           for (String param : body) {
+               String[] kv = param.split("=");
+               params.put(kv[0], kv[1]);
+           }
+
+
+            boolean pass = submitter.submitWithin(
+                    params.get("picker"),
+                    params.get("pin"),
+                    DATE_FORMAT.parse(params.get("startDate").replace("%2F", "/")),
+                    DATE_FORMAT.parse(params.get("endDate").replace("%2F", "/"))
+            );
+
+           if (pass) {
+               out.println("HTTP/1.1 303 See Other");
+               out.println("Location: success.html");
+               out.println(); // blank line between headers and content, very important !
+               out.flush(); // flush character output stream buffer
+           }
+
+           System.out.println(pass ? "All passed." : "Something failed");
+
+       } catch (IOException | ParseException e) {
+            e.printStackTrace();
         }
     }
 }

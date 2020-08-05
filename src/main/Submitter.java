@@ -23,15 +23,23 @@ public class Submitter {
         setUpHTTP();
     }
 
-    public boolean submitWithin(String name, String pin, Date start, Date end) {
+    /**
+     * Hits the server up for all AM PMs within the provided dates
+     * @param memberId person submitting
+     * @param pin 4 digit numeric
+     * @param start when to fill from (inclusive)
+     * @param end when to fill till (inclusive)
+     * @return did all "OK"?
+     */
+    public boolean submitWithin(String memberId, String pin, Date start, Date end) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(start);
 
         while (!cal.getTime().after(end)) {
-            boolean check = submit(name, pin, cal.getTime(), true) & submit(name, pin, cal.getTime(), false);
+            boolean check = submit(memberId, pin, cal.getTime(), true) & submit(memberId, pin, cal.getTime(), false);
 
             if (!check) {
-                System.out.println(String.format("Failed on: %s with PIN: %s, Date: %tF", name, pin, cal.getTime()));
+                System.out.println(String.format("Failed on: %s with PIN: %s, Date: %tF", memberId, pin, cal.getTime()));
                 return false;
             }
             cal.add(Calendar.DATE, 1);
