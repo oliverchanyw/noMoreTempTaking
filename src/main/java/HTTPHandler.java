@@ -16,7 +16,7 @@ public class HTTPHandler implements Runnable {
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
     SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("MM/dd/yyyy");
     // port to listen connection
-    static final int PORT = 8080;
+    static final int PORT = 80;
 
     private Socket connect; // Client Connection via Socket Class
     private Submitter submitter;

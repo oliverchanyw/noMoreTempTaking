@@ -6,8 +6,9 @@ import java.util.*;
 
 public class Submitter {
 
-    private static String URL = "https://temptaking.ado.sg/group/MemberSubmitTemperature";
     private static String GROUPCODE = "33ba9f0d729b39833259929f7fb99241";
+    private static String URL = "https://temptaking.ado.sg/group/MemberSubmitTemperature";
+    private static String URL_PIN = "https://temptaking.ado.sg/group/MemberCreatePin";
     private static double MAX_TEMP = 37.3;
     private static double MIN_TEMP = 34.9;
 
@@ -109,6 +110,39 @@ public class Submitter {
                         "&memberId=" + memberId +
                         "&temperature=" + temperature +
                         "&pin=" + pin;
+
+        return out;
+    }
+
+    /**
+     *
+     * @param memberId
+     * @param pin
+     * @return
+     */
+    public boolean setPin(String memberId, String pin) {
+        try {
+            Connection connection = Jsoup.connect(URL_PIN)
+                    .headers(headers)
+                    .header("Cookie", String.format("memberId=%s; JSESSIONID=d253b4542d544c667ab5b6bab410; loginToken=c3bbcfeadc97eb66d07f9299054aa1b9", memberId))
+                    .requestBody(makePinBody(memberId, pin))
+                    .userAgent("Mozilla")
+                    .method(Connection.Method.POST);
+
+            Connection.Response res = connection.execute();
+
+            if (res.statusCode() != 200) return false;
+        } catch (IOException e) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private String makePinBody(String memberId, String pin) {
+        String out =    "groupCode=" + GROUPCODE +
+                "&memberId=" + memberId +
+                "&pin=" + pin;
 
         return out;
     }
